@@ -1,0 +1,5 @@
+# Force Unix line endings for shell scripts
+*.sh text eol=lf
+
+# Auto-detect everything else
+* text=auto
