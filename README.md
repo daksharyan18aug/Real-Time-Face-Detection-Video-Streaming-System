@@ -87,30 +87,44 @@ docker compose down -v
 ---
 
 ## Project Structure
-├── architecture.png          # System architecture diagram
-├── docker-compose.yml        # All services wired together
-├── .env.example              # Environment variable template
-├── backend/
-│   ├── app/
-│   │   ├── main.py           # FastAPI endpoints
-│   │   ├── detector.py       # MediaPipe face detection
-│   │   ├── drawer.py         # Pillow ROI drawing
-│   │   ├── models.py         # SQLAlchemy DB models
-│   │   ├── schemas.py        # Pydantic schemas
-│   │   ├── database.py       # DB connection
-│   │   └── crud.py           # DB operations
-│   ├── tests/                # pytest test suite
-│   ├── alembic/              # DB migrations
-│   └── Dockerfile
-└── frontend/
-├── src/
-│   ├── App.jsx
-│   └── components/
-│       ├── VideoStream.jsx
-│       └── ROITable.jsx
-└── Dockerfile
 
----
+```
+Real-Time-Face-Detection-Video-Streaming-System/
+├── architecture.png
+├── docker-compose.yml
+├── .env.example
+├── README.md
+├── backend/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── entrypoint.sh
+│   ├── alembic.ini
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── detector.py
+│   │   ├── drawer.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── database.py
+│   │   └── crud.py
+│   ├── alembic/
+│   │   └── versions/
+│   └── tests/
+│       ├── test_api.py
+│       ├── test_detector.py
+│       └── test_drawer.py
+└── frontend/
+    ├── Dockerfile
+    ├── nginx.conf
+    ├── package.json
+    └── src/
+        ├── App.jsx
+        ├── App.css
+        ├── index.js
+        └── components/
+            ├── VideoStream.jsx
+            └── ROITable.jsx
+```
 
 ## Running Tests
 
