@@ -148,6 +148,13 @@ AI was used for:
 All code was reviewed, understood, and adapted manually.
 
 ---
+## Results
+
+### Live Face Detection Stream
+![Face Detection Stream](result_stream.png)
+
+### ROI Detection Data
+![ROI Data Table](result_roi.png)
 
 ## Security Notes
 
