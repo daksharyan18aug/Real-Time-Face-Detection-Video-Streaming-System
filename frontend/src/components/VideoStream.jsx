@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 
 const WS_URL = process.env.REACT_APP_WS_URL || "ws://localhost:8000/ws/stream";
-const FRAME_INTERVAL_MS = 100; // send 10 frames per second
+const FRAME_INTERVAL_MS = 100;
 
 function VideoStream({ onSessionStart, onStreamingChange }) {
   const videoRef = useRef(null);
@@ -15,7 +15,6 @@ function VideoStream({ onSessionStart, onStreamingChange }) {
   const [faceDetected, setFaceDetected] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
 
-  // Start camera + WebSocket
   const startStream = useCallback(async () => {
     setError(null);
 
@@ -55,7 +54,6 @@ function VideoStream({ onSessionStart, onStreamingChange }) {
         canvas.height = video.videoHeight || 480;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Convert frame to JPEG blob and send
         canvas.toBlob(
           (blob) => {
             if (blob && ws.readyState === WebSocket.OPEN) {
@@ -69,22 +67,33 @@ function VideoStream({ onSessionStart, onStreamingChange }) {
       }, FRAME_INTERVAL_MS);
     };
 
-    // 4. Receive annotated frames back
+    // 4. Receive messages from backend
     ws.onmessage = (event) => {
-      const blob = new Blob([event.data], { type: "image/jpeg" });
-      const url = URL.createObjectURL(blob);
-
-      if (annotatedImgRef.current) {
-        // Revoke previous URL to avoid memory leaks
-        if (annotatedImgRef.current.src.startsWith("blob:")) {
-          URL.revokeObjectURL(annotatedImgRef.current.src);
-        }
-        annotatedImgRef.current.src = url;
+  // Text frame = session_id JSON from backend
+  if (typeof event.data === "string") {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === "session") {
+        console.log("Session ID received:", msg.session_id);
+        onSessionStart(msg.session_id);
       }
+    } catch (e) {}
+    return;
+  }
 
-      // Simple heuristic — if frame came back it was processed
-      setFaceDetected(true);
-    };
+  // Binary frame = annotated JPEG
+  if (event.data instanceof ArrayBuffer) {
+    const blob = new Blob([event.data], { type: "image/jpeg" });
+    const url = URL.createObjectURL(blob);
+    if (annotatedImgRef.current) {
+      if (annotatedImgRef.current.src.startsWith("blob:")) {
+        URL.revokeObjectURL(annotatedImgRef.current.src);
+      }
+      annotatedImgRef.current.src = url;
+    }
+    setFaceDetected(true);
+  }
+};
 
     ws.onerror = () => {
       setError("WebSocket error — is the backend running?");
@@ -92,12 +101,6 @@ function VideoStream({ onSessionStart, onStreamingChange }) {
 
     ws.onclose = (event) => {
       console.log("WebSocket closed", event.code);
-
-      // Extract session_id from close reason if sent by server
-      if (event.reason) {
-        onSessionStart(event.reason);
-      }
-
       setStreaming(false);
       onStreamingChange(false);
       setFaceDetected(false);
@@ -132,13 +135,14 @@ function VideoStream({ onSessionStart, onStreamingChange }) {
   return (
     <div className="video-stream">
       <div className="video-container">
-        {/* Hidden: raw camera feed used for frame capture */}
+
+        {/* Hidden: raw camera feed for frame capture */}
         <video ref={videoRef} style={{ display: "none" }} muted />
 
-        {/* Hidden: canvas used to grab frames */}
+        {/* Hidden: canvas to grab frames */}
         <canvas ref={canvasRef} style={{ display: "none" }} />
 
-        {/* Visible: annotated frames returned from backend */}
+        {/* Visible: annotated frames from backend */}
         <img
           ref={annotatedImgRef}
           alt="Annotated video feed"

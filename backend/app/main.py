@@ -8,13 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from sqlalchemy.orm import Session
 
-from app.database import get_db, engine, Base
+from app.database import get_db
 from app.detector import detect_face
 from app.drawer import draw_roi
 from app.crud import save_roi, get_rois_by_session, get_latest_roi
 from app.schemas import ROIRecordCreate, ROIRecordOut
-
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,7 +23,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow React frontend to connect
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,7 +37,6 @@ app.add_middleware(
 # ─────────────────────────────────────────
 @app.get("/health")
 def health_check():
-    """Basic health check — confirms API is running."""
     return {
         "status": "ok",
         "timestamp": datetime.now(timezone.utc).isoformat()
@@ -52,18 +48,14 @@ def health_check():
 # ─────────────────────────────────────────
 @app.websocket("/ws/stream")
 async def video_stream(websocket: WebSocket, db: Session = Depends(get_db)):
-    """
-    Receives raw JPEG frames from the React frontend over WebSocket.
-    Detects faces using MediaPipe.
-    Draws ROI bounding box using Pillow (no OpenCV).
-    Stores ROI data in PostgreSQL.
-    Returns annotated JPEG frames back to the frontend.
-    """
     await websocket.accept()
 
     # Unique ID to group all frames from this connection
     session_id = str(uuid.uuid4())
     logger.info(f"New WebSocket connection — session_id: {session_id}")
+
+    # Send session_id to frontend as first message
+    await websocket.send_json({"type": "session", "session_id": session_id})
 
     try:
         frame_count = 0
@@ -105,7 +97,6 @@ async def video_stream(websocket: WebSocket, db: Session = Depends(get_db)):
                 logger.info(f"Face detected — frame: {frame_id} | box: ({x},{y},{w},{h}) | conf: {confidence:.2f}")
 
             else:
-                # No face — return original frame unchanged
                 annotated_image = image
                 logger.debug(f"No face detected — frame: {frame_id}")
 
@@ -130,22 +121,16 @@ async def video_stream(websocket: WebSocket, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────
 @app.get("/roi", response_model=list[ROIRecordOut])
 def get_roi_data(
-    session_id: str = Query(..., description="Session ID returned when WebSocket connects"),
+    session_id: str = Query(..., description="Session ID"),
     limit: int = Query(50, ge=1, le=500, description="Max number of records to return"),
     db: Session = Depends(get_db),
 ):
-    """
-    Returns all stored ROI records for a given session.
-    Records are ordered most-recent first.
-    """
     records = get_rois_by_session(db, session_id)
-
     if not records:
         raise HTTPException(
             status_code=404,
             detail=f"No ROI records found for session_id: {session_id}"
         )
-
     return records[:limit]
 
 
@@ -157,13 +142,10 @@ def get_latest_roi_data(
     session_id: str = Query(..., description="Session ID"),
     db: Session = Depends(get_db),
 ):
-    """Returns only the most recent ROI record for a session."""
     record = get_latest_roi(db, session_id)
-
     if not record:
         raise HTTPException(
             status_code=404,
             detail=f"No ROI records found for session_id: {session_id}"
         )
-
     return record
